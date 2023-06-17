@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Measurement Converter</title>
+</head>
+<body>
+  <h1>Measurement Converter</h1>
+  <label for="measurementsInput">Enter Measurements:</label>
+  <input type="text" id="measurementsInput">
+  <button onclick="convertMeasurements()">Convert</button>
+  <br>
+  <label for="result">Result:</label>
+  <span id="result"></span>
+
+   <script>
+    // Check login status
+    var isLoggedIn = localStorage.getItem('isLoggedIn');
+
+    if (!isLoggedIn) {
+      // User is not logged in, redirect to the login page
+      window.location.href = 'login.html';
+    }
+
+    function convertMeasurements() {
+      var measurementsInput = document.getElementById("measurementsInput").value;
+
+      fetch("http://localhost:8080/convert-measurements", {
+        method: "POST",
+        body: new URLSearchParams({
+          "convert-measurements": measurementsInput
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        var resultElement = document.getElementById("result");
+        resultElement.innerHTML = data.result.join(", ");
+      })
+      .catch(error => console.error("Error:", error));
+    }
+  </script>
+</body>
+</html>
