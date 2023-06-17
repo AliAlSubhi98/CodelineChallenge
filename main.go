@@ -210,6 +210,7 @@ func convertMeasurements(str string) []int {
 
 		for i := 0; i < len(str); i++ {
 			char := str[i]
+			charVal = int(str[i]) - 96
 			if char == '_' {
 				charVal = 0
 				if isValAfterZ {
