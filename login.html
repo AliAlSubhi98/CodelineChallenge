@@ -3,14 +3,11 @@
 <head>
   <title>Login</title>
   <link rel="stylesheet" type="text/css" href="loginStyle.css">
-  <!-- <script>
-    
-  </script> -->
 </head>
 <body>
   <h1>Login to Measurement System</h1>
   <div class="container">
-    <form id="login-form">
+    <form id="loginForm">
       <input type="text" id="username" placeholder="Username" required>
       <input type="password" id="password" placeholder="Password" required>
       <button type="submit">Log in</button>
@@ -18,30 +15,25 @@
     <p id="error-message"></p>
 
     <script>
-      function login(event) {
-        event.preventDefault();
-  
-        var username = document.getElementById('username').value;
-        var password = document.getElementById('password').value;
-  
-        // Perform authorization check here (e.g., compare username and password with stored values)
-        if (username === 'admin' && password === 'admin') {
-          // Authorized, store login status in localStorage
-          localStorage.setItem('isLoggedIn', true);
-    
-          // Redirect to index.html
-          window.location.href = 'index.html';
+      document.getElementById("loginForm").addEventListener("submit", function(event) {
+        event.preventDefault(); // Prevent form submission
+
+        // Check the entered username and password
+        var username = document.getElementById("username").value;
+        var password = document.getElementById("password").value;
+
+        // Validate the username and password
+        if (username === "admin" && password === "a") {
+          // If the credentials are correct, set the logged-in state and token expiration time, then redirect to the index page
+          localStorage.setItem("isLoggedIn", "true");
+          localStorage.setItem("tokenExpiration", Date.now() + 10000); // 30 seconds expiration
+          window.location.href = "index.html";
         } else {
-          // Unauthorized, show error message
-          document.getElementById('error-message').textContent = 'Invalid username or password';
+          // Display an error message
+          alert("Invalid username or password. Please try again.");
         }
-}
-
-// Attach the login event listener
-document.getElementById('login-form').addEventListener('submit', login);
-
+      });
     </script>
-
   </div>
 </body>
 </html>
