@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"time"
 
 	_ "github.com/denisenkom/go-mssqldb" // MS SQL Server driver
 )
@@ -43,7 +44,7 @@ func createTables() error {
 		// Create the user_table
 		createUserTable := `
 		CREATE TABLE user_table (
-			id INT PRIMARY KEY,
+			id INT IDENTITY(1, 1) PRIMARY KEY,
 			name VARCHAR(255),
 			last_login_date DATETIME
 		)
@@ -82,15 +83,10 @@ func createTables() error {
 	} else {
 		// Create the user_activity_table
 		createUserActivityTable := `
-		CREATE TABLE user_activity_table (
-			datetime DATETIME,
-			user_id INT,
-			username VARCHAR(255),
-			measurement_value VARCHAR(255),
-			measurement_result_id INT,
-			FOREIGN KEY (user_id) REFERENCES user_table(id),
-			FOREIGN KEY (measurement_result_id) REFERENCES measurement_result_table(measurement_result_id)
-		)
+		CREATE VIEW third_table_view AS
+		SELECT u.last_login_date, u.id AS user_id, u.name, m.measurement_value, m.measurement_result_id
+		FROM user_table u
+		CROSS JOIN measurement_result_table m;								
 		`
 
 		_, err := db.Exec(createUserActivityTable)
@@ -122,6 +118,7 @@ func main() {
 		fmt.Println("Tables created successfully")
 	}
 
+	http.HandleFunc("/user", userHandler)
 	http.HandleFunc("/convert-measurements", convertMeasurementsHandler)
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/", fs) // Serve static files
@@ -129,10 +126,44 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
+func userHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	err := r.ParseForm()
+	if err != nil {
+		log.Println("Error parsing form data:", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	username := r.FormValue("username")
+	loginDate := time.Now()
+	err = storeUserLogin(username, loginDate)
+	if err != nil {
+		log.Println("Error storing user login:", err)
+		// Return an error response if desired
+	}
+}
+
 func convertMeasurementsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	measurements := r.FormValue("convert-measurements")
+	err := r.ParseForm()
+	if err != nil {
+		log.Println("Error parsing form data:", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// username := r.FormValue("username")
+	// loginDate := time.Now()
+	// err = storeUserLogin(username, loginDate)
+	// if err != nil {
+	// 	log.Println("Error storing user login:", err)
+	// 	// Return an error response if desired
+	// }
+
+	measurements := r.Form.Get("convert-measurements")
 	result := convertMeasurements(measurements)
 	response := struct {
 		Result []int `json:"result"`
@@ -140,14 +171,39 @@ func convertMeasurementsHandler(w http.ResponseWriter, r *http.Request) {
 		Result: result,
 	}
 
-	// Store the measurement conversion result in the database
-	err := storeMeasurementResult(measurements, result)
+	err = storeMeasurementResult(measurements, result)
 	if err != nil {
 		log.Println("Error storing measurement result:", err)
+		// Return an error response if desired
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func storeUserLogin(username string, loginDate time.Time) error {
+	db, err := getConnection()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("INSERT INTO user_table (name, last_login_date) VALUES (@name, @last_login_date)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	fmt.Println("Storing user login:")
+	fmt.Println("Username:", username)
+	fmt.Println("Login Date:", loginDate)
+
+	_, err = stmt.Exec(sql.Named("name", username), sql.Named("last_login_date", loginDate))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func storeMeasurementResult(measurementValue string, result []int) error {
@@ -157,28 +213,15 @@ func storeMeasurementResult(measurementValue string, result []int) error {
 	}
 	defer db.Close()
 
-	// Prepare the SQL statement
-	stmt, err := db.Prepare("INSERT INTO measurement_result_table (measurement_value, result_value) VALUES (@MeasurementValue, @ResultValue)")
+	stmt, err := db.Prepare("INSERT INTO measurement_result_table (measurement_value, result_value) VALUES (@measurement_value, @result_value)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	// Start a transaction to ensure atomicity
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
+	resultValue := resultToString(result)
 
-	// Execute the SQL statement once with all the result values
-	_, err = stmt.Exec(sql.Named("MeasurementValue", measurementValue), sql.Named("ResultValue", resultToString(result)))
-	if err != nil {
-		tx.Rollback() // Rollback the transaction if an error occurs
-		return err
-	}
-
-	// Commit the transaction if the execution is successful
-	err = tx.Commit()
+	_, err = stmt.Exec(sql.Named("measurement_value", measurementValue), sql.Named("result_value", resultValue))
 	if err != nil {
 		return err
 	}

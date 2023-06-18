@@ -18,6 +18,8 @@
     // Check if the user is logged in and the token is still valid
     var isLoggedIn = localStorage.getItem("isLoggedIn");
     var tokenExpiration = localStorage.getItem("tokenExpiration");
+    var username = localStorage.getItem("username"); // Retrieve the stored username
+
 
     if (!isLoggedIn || !tokenExpiration || Date.now() > tokenExpiration) {
       // If not logged in or token expired, redirect to the login page
@@ -25,12 +27,18 @@
     }
 
     function convertMeasurements() {
+      if (!isLoggedIn || !tokenExpiration || Date.now() > tokenExpiration) {
+      // If not logged in or token expired, redirect to the login page
+      window.location.href = "login.html";
+    }
+    else{
       var measurementsInput = document.getElementById("measurementsInput").value;
 
       fetch("http://localhost:8080/convert-measurements", {
         method: "POST",
         body: new URLSearchParams({
-          "convert-measurements": measurementsInput
+          "convert-measurements": measurementsInput,
+          "username": username
         })
       })
       .then(response => response.json())
@@ -39,6 +47,7 @@
         resultElement.innerHTML = data.result.join(", ");
       })
       .catch(error => console.error("Error:", error));
+    }
     }
   </script>
 </body>
